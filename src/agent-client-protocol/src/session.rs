@@ -4,8 +4,7 @@ use agent_client_protocol_schema::{
     ContentBlock, ContentChunk, NewSessionRequest, NewSessionResponse, PromptRequest,
     PromptResponse, SessionModeState, SessionNotification, SessionUpdate, StopReason,
 };
-use futures::channel::mpsc;
-use tokio::sync::oneshot;
+use futures::channel::{mpsc, oneshot};
 
 use crate::{
     Agent, Client, ConnectionTo, Dispatch, HandleDispatchFrom, Handled, Responder, Role,

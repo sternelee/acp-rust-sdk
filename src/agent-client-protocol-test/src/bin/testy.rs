@@ -7,7 +7,7 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .init();
     Testy::new()
-        .connect_to(agent_client_protocol_tokio::Stdio::new())
+        .connect_to(agent_client_protocol::Stdio::new())
         .await?;
     Ok(())
 }

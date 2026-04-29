@@ -21,7 +21,7 @@
 //! yopo "Hello!" '{"type":"stdio","name":"my-agent","command":"python","args":["agent.py"],"env":[]}'
 //! ```
 
-use agent_client_protocol_tokio::AcpAgent;
+use agent_client_protocol::AcpAgent;
 use clap::Parser;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 

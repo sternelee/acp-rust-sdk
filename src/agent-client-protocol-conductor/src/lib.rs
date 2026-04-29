@@ -72,7 +72,7 @@
 //!
 //! - **[agent-client-protocol-proxy](https://crates.io/crates/agent-client-protocol-proxy)** - Framework for building proxy components
 //! - **[agent-client-protocol](https://crates.io/crates/agent-client-protocol)** - Core ACP SDK
-//! - **[agent-client-protocol-tokio](https://crates.io/crates/agent-client-protocol-tokio)** - Tokio utilities for process spawning
+//! - **[agent-client-protocol](https://crates.io/crates/agent-client-protocol)** - Core protocol types, traits, and process spawning
 
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -91,8 +91,8 @@ pub use self::conductor::*;
 
 use clap::{Parser, Subcommand};
 
+use agent_client_protocol::{AcpAgent, Stdio};
 use agent_client_protocol::{Client, Conductor, DynConnectTo, schema::InitializeRequest};
-use agent_client_protocol_tokio::{AcpAgent, Stdio};
 use tracing::Instrument;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 

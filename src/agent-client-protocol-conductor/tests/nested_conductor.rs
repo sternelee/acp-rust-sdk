@@ -19,12 +19,12 @@
 //!
 //! Run `just prep-tests` before running these tests.
 
+use agent_client_protocol::AcpAgent;
 use agent_client_protocol::{Conductor, ConnectTo, DynConnectTo};
 use agent_client_protocol_conductor::{ConductorImpl, McpBridgeMode, ProxiesAndAgent};
 use agent_client_protocol_test::arrow_proxy::run_arrow_proxy;
 use agent_client_protocol_test::test_binaries::{arrow_proxy_example, conductor_binary, testy};
 use agent_client_protocol_test::testy::{Testy, TestyCommand};
-use agent_client_protocol_tokio::AcpAgent;
 use tokio::io::duplex;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 

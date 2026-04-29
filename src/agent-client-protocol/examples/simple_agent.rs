@@ -1,6 +1,5 @@
 use agent_client_protocol::schema::{AgentCapabilities, InitializeRequest, InitializeResponse};
-use agent_client_protocol::{Agent, Client, ConnectionTo, Dispatch, Result};
-use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
+use agent_client_protocol::{Agent, Client, ConnectionTo, Dispatch, Result, Stdio};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,9 +23,6 @@ async fn main() -> Result<()> {
             },
             agent_client_protocol::on_receive_dispatch!(),
         )
-        .connect_to(agent_client_protocol::ByteStreams::new(
-            tokio::io::stdout().compat_write(),
-            tokio::io::stdin().compat(),
-        ))
+        .connect_to(Stdio::new())
         .await
 }

@@ -20,7 +20,6 @@ test-support = []
 [dependencies]
 agent-client-protocol.workspace = true
 agent-client-protocol-schema.workspace = true
-agent-client-protocol-tokio.workspace = true
 agent-client-protocol-trace-viewer.workspace = true
 anyhow.workspace = true
 async-stream.workspace = true
@@ -46,7 +45,6 @@ uuid.workspace = true
 
 [dev-dependencies]
 agent-client-protocol-test.workspace = true
-agent-client-protocol-tokio.workspace = true
 yopo.workspace = true
 expect-test.workspace = true
 regex.workspace = true

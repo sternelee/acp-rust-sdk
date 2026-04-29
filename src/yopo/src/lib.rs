@@ -67,7 +67,7 @@ pub fn content_block_to_string(block: &ContentBlock) -> String {
 ///
 /// ```ignore
 /// use yopo::{prompt_with_callback, content_block_to_string};
-/// use agent_client_protocol_tokio::AcpAgent;
+/// use agent_client_protocol::AcpAgent;
 /// use std::str::FromStr;
 ///
 /// # async fn example() -> Result<(), agent_client_protocol::Error> {
@@ -217,7 +217,7 @@ pub async fn prompt_with_callback(
 ///
 /// ```ignore
 /// use yopo::prompt;
-/// use agent_client_protocol_tokio::AcpAgent;
+/// use agent_client_protocol::AcpAgent;
 /// use std::str::FromStr;
 ///
 /// # async fn example() -> Result<(), agent_client_protocol::Error> {

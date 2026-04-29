@@ -1,15 +1,16 @@
 //! Utilities for connecting to ACP agents and proxies.
 //!
-//! This module provides [`AcpAgent`], a convenient wrapper around [`agent_client_protocol::schema::McpServer`]
+//! This module provides [`AcpAgent`], a convenient wrapper around [`crate::schema::McpServer`]
 //! that can be parsed from either a command string or JSON configuration.
 
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use agent_client_protocol::{Client, Conductor, Role};
-use tokio::process::Child;
-use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
+use async_process::Child;
+use std::pin::pin;
+
+use crate::{Client, Conductor, Role};
 
 /// Direction of a line being sent or received.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,62 +25,38 @@ pub enum LineDirection {
 
 /// A component representing an external ACP agent running in a separate process.
 ///
-/// `AcpAgent` implements the [`agent_client_protocol::ConnectTo`] trait for spawning and communicating with
+/// `AcpAgent` implements the [`ConnectTo`](`crate::ConnectTo`) trait for spawning and communicating with
 /// external agents or proxies via stdio. It handles process spawning, stream setup, and
 /// byte stream serialization automatically. This is the primary way to connect to agents
 /// that run as separate executables.
 ///
-/// This is a wrapper around [`agent_client_protocol::schema::McpServer`] that provides convenient parsing
+/// This is a wrapper around [`crate::schema::McpServer`] that provides convenient parsing
 /// from command-line strings or JSON configurations.
 ///
 /// # Use Cases
 ///
 /// - **External agents**: Connect to agents written in any language (Python, Node.js, Rust, etc.)
 /// - **Proxy chains**: Spawn intermediate proxies that transform or intercept messages
-/// - **Conductor components**: Use with [`agent_client_protocol_conductor::Conductor`] to build proxy chains
+/// - **Conductor components**: Use with the conductor to build proxy chains
 /// - **Subprocess isolation**: Run potentially untrusted code in a separate process
 ///
 /// # Examples
 ///
 /// Parse from a command string:
 /// ```
-/// # use agent_client_protocol_tokio::AcpAgent;
+/// # use agent_client_protocol::AcpAgent;
 /// # use std::str::FromStr;
 /// let agent = AcpAgent::from_str("python my_agent.py --verbose").unwrap();
 /// ```
 ///
 /// Parse from JSON:
 /// ```
-/// # use agent_client_protocol_tokio::AcpAgent;
+/// # use agent_client_protocol::AcpAgent;
 /// # use std::str::FromStr;
 /// let agent = AcpAgent::from_str(r#"{"type": "stdio", "name": "my-agent", "command": "python", "args": ["my_agent.py"], "env": []}"#).unwrap();
 /// ```
-///
-/// Use as a component to connect to an external agent:
-/// ```ignore
-/// use agent_client_protocol::{Client, Builder};
-/// use agent_client_protocol_tokio::AcpAgent;
-/// use std::str::FromStr;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let agent = AcpAgent::from_str("python my_agent.py")?;
-///
-/// // The agent process will be spawned automatically when connected
-/// Client.builder()
-///     .connect_to(agent)
-///     .await?
-///     .connect_with(|cx| async move {
-///         // Use the connection to communicate with the agent process
-///         Ok(())
-///     })
-///     .await?;
-/// # Ok(())
-/// # }
-/// ```
-///
-/// [`agent_client_protocol_conductor::Conductor`]: https://docs.rs/agent-client-protocol-conductor/latest/agent_client_protocol_conductor/struct.Conductor.html
 pub struct AcpAgent {
-    server: agent_client_protocol::schema::McpServer,
+    server: crate::schema::McpServer,
     debug_callback: Option<Arc<dyn Fn(&str, LineDirection) + Send + Sync + 'static>>,
 }
 
@@ -96,9 +73,9 @@ impl std::fmt::Debug for AcpAgent {
 }
 
 impl AcpAgent {
-    /// Create a new `AcpAgent` from an [`agent_client_protocol::schema::McpServer`] configuration.
+    /// Create a new `AcpAgent` from an [`crate::schema::McpServer`] configuration.
     #[must_use]
-    pub fn new(server: agent_client_protocol::schema::McpServer) -> Self {
+    pub fn new(server: crate::schema::McpServer) -> Self {
         Self {
             server,
             debug_callback: None,
@@ -127,15 +104,15 @@ impl AcpAgent {
             .expect("valid bash command")
     }
 
-    /// Get the underlying [`agent_client_protocol::schema::McpServer`] configuration.
+    /// Get the underlying [`crate::schema::McpServer`] configuration.
     #[must_use]
-    pub fn server(&self) -> &agent_client_protocol::schema::McpServer {
+    pub fn server(&self) -> &crate::schema::McpServer {
         &self.server
     }
 
-    /// Convert into the underlying [`agent_client_protocol::schema::McpServer`] configuration.
+    /// Convert into the underlying [`crate::schema::McpServer`] configuration.
     #[must_use]
-    pub fn into_server(self) -> agent_client_protocol::schema::McpServer {
+    pub fn into_server(self) -> crate::schema::McpServer {
         self.server
     }
 
@@ -147,7 +124,7 @@ impl AcpAgent {
     /// # Example
     ///
     /// ```no_run
-    /// # use agent_client_protocol_tokio::{AcpAgent, LineDirection};
+    /// # use agent_client_protocol::{AcpAgent, LineDirection};
     /// # use std::str::FromStr;
     /// let agent = AcpAgent::from_str("python my_agent.py")
     ///     .unwrap()
@@ -165,21 +142,21 @@ impl AcpAgent {
     }
 
     /// Spawn the process and get stdio streams.
-    /// Used internally by the Component trait implementation.
+    /// Used internally by the `ConnectTo` trait implementation.
     pub fn spawn_process(
         &self,
     ) -> Result<
         (
-            tokio::process::ChildStdin,
-            tokio::process::ChildStdout,
-            tokio::process::ChildStderr,
+            async_process::ChildStdin,
+            async_process::ChildStdout,
+            async_process::ChildStderr,
             Child,
         ),
-        agent_client_protocol::Error,
+        crate::Error,
     > {
         match &self.server {
-            agent_client_protocol::schema::McpServer::Stdio(stdio) => {
-                let mut cmd = tokio::process::Command::new(&stdio.command);
+            crate::schema::McpServer::Stdio(stdio) => {
+                let mut cmd = async_process::Command::new(&stdio.command);
                 cmd.args(&stdio.args);
                 for env_var in &stdio.env {
                     cmd.env(&env_var.name, &env_var.value);
@@ -188,33 +165,30 @@ impl AcpAgent {
                     .stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::piped());
 
-                let mut child = cmd
-                    .spawn()
-                    .map_err(agent_client_protocol::Error::into_internal_error)?;
+                let mut child = cmd.spawn().map_err(crate::Error::into_internal_error)?;
 
-                let child_stdin = child.stdin.take().ok_or_else(|| {
-                    agent_client_protocol::util::internal_error("Failed to open stdin")
-                })?;
-                let child_stdout = child.stdout.take().ok_or_else(|| {
-                    agent_client_protocol::util::internal_error("Failed to open stdout")
-                })?;
-                let child_stderr = child.stderr.take().ok_or_else(|| {
-                    agent_client_protocol::util::internal_error("Failed to open stderr")
-                })?;
+                let child_stdin = child
+                    .stdin
+                    .take()
+                    .ok_or_else(|| crate::util::internal_error("Failed to open stdin"))?;
+                let child_stdout = child
+                    .stdout
+                    .take()
+                    .ok_or_else(|| crate::util::internal_error("Failed to open stdout"))?;
+                let child_stderr = child
+                    .stderr
+                    .take()
+                    .ok_or_else(|| crate::util::internal_error("Failed to open stderr"))?;
 
                 Ok((child_stdin, child_stdout, child_stderr, child))
             }
-            agent_client_protocol::schema::McpServer::Http(_) => {
-                Err(agent_client_protocol::util::internal_error(
-                    "HTTP transport not yet supported by AcpAgent",
-                ))
-            }
-            agent_client_protocol::schema::McpServer::Sse(_) => {
-                Err(agent_client_protocol::util::internal_error(
-                    "SSE transport not yet supported by AcpAgent",
-                ))
-            }
-            _ => Err(agent_client_protocol::util::internal_error(
+            crate::schema::McpServer::Http(_) => Err(crate::util::internal_error(
+                "HTTP transport not yet supported by AcpAgent",
+            )),
+            crate::schema::McpServer::Sse(_) => Err(crate::util::internal_error(
+                "SSE transport not yet supported by AcpAgent",
+            )),
+            _ => Err(crate::util::internal_error(
                 "Unknown MCP server transport type",
             )),
         }
@@ -226,35 +200,34 @@ struct ChildGuard(Child);
 
 impl ChildGuard {
     async fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
-        self.0.wait().await
+        self.0.status().await
     }
 }
 
 impl Drop for ChildGuard {
     fn drop(&mut self) {
-        drop(self.0.start_kill());
+        drop(self.0.kill());
     }
 }
 
 /// Waits for a child process and returns an error if it exits with non-zero status.
 ///
-/// The error message includes any stderr output collected by the background task.
+/// The error message includes any stderr output collected concurrently.
 /// When dropped, the child process is killed.
 async fn monitor_child(
     child: Child,
-    stderr_rx: tokio::sync::oneshot::Receiver<String>,
-) -> Result<(), agent_client_protocol::Error> {
+    stderr_rx: futures::channel::oneshot::Receiver<String>,
+) -> Result<(), crate::Error> {
     let mut guard = ChildGuard(child);
 
-    // Wait for the child to exit
-    let status = guard.wait().await.map_err(|e| {
-        agent_client_protocol::util::internal_error(format!("Failed to wait for process: {e}"))
-    })?;
+    let status = guard
+        .wait()
+        .await
+        .map_err(|e| crate::util::internal_error(format!("Failed to wait for process: {e}")))?;
 
     if status.success() {
         Ok(())
     } else {
-        // Get stderr content if available
         let stderr = stderr_rx.await.unwrap_or_default();
 
         let message = if stderr.is_empty() {
@@ -263,7 +236,7 @@ async fn monitor_child(
             format!("Process exited with {status}: {stderr}")
         };
 
-        Err(agent_client_protocol::util::internal_error(message))
+        Err(crate::util::internal_error(message))
     }
 }
 
@@ -274,36 +247,32 @@ impl AcpAgentCounterpartRole for Client {}
 
 impl AcpAgentCounterpartRole for Conductor {}
 
-impl<Counterpart: AcpAgentCounterpartRole> agent_client_protocol::ConnectTo<Counterpart>
-    for AcpAgent
-{
+impl<Counterpart: AcpAgentCounterpartRole> crate::ConnectTo<Counterpart> for AcpAgent {
     async fn connect_to(
         self,
-        client: impl agent_client_protocol::ConnectTo<Counterpart::Counterpart>,
-    ) -> Result<(), agent_client_protocol::Error> {
-        use futures::AsyncBufReadExt;
-        use futures::AsyncWriteExt;
-        use futures::StreamExt;
+        client: impl crate::ConnectTo<Counterpart::Counterpart>,
+    ) -> Result<(), crate::Error> {
         use futures::io::BufReader;
+        use futures::{AsyncBufReadExt, AsyncWriteExt, StreamExt};
 
         let (child_stdin, child_stdout, child_stderr, child) = self.spawn_process()?;
 
         // Create a channel to collect stderr for error reporting
-        let (stderr_tx, stderr_rx) = tokio::sync::oneshot::channel::<String>();
+        let (stderr_tx, stderr_rx) = futures::channel::oneshot::channel::<String>();
 
-        // Spawn a task to read stderr, optionally calling the debug callback
+        // Read stderr concurrently, optionally calling the debug callback.
+        // We use futures::future::select below to race this against the protocol,
+        // so this runs as part of the same task — no tokio::spawn needed.
         let debug_callback = self.debug_callback.clone();
-        tokio::spawn(async move {
-            let stderr_reader = BufReader::new(child_stderr.compat());
+        let stderr_future = async move {
+            let stderr_reader = BufReader::new(child_stderr);
             let mut stderr_lines = stderr_reader.lines();
             let mut collected = String::new();
             while let Some(line_result) = stderr_lines.next().await {
                 if let Ok(line) = line_result {
-                    // Call debug callback if present
                     if let Some(ref callback) = debug_callback {
                         callback(&line, LineDirection::Stderr);
                     }
-                    // Always collect for error reporting
                     if !collected.is_empty() {
                         collected.push('\n');
                     }
@@ -311,31 +280,30 @@ impl<Counterpart: AcpAgentCounterpartRole> agent_client_protocol::ConnectTo<Coun
                 }
             }
             drop(stderr_tx.send(collected));
-        });
+        };
 
         // Create a future that monitors the child process for early exit
         let child_monitor = monitor_child(child, stderr_rx);
 
         // Convert stdio to line streams with optional debug inspection
-        let incoming_lines = if let Some(callback) = self.debug_callback.clone() {
-            Box::pin(
-                BufReader::new(child_stdout.compat())
-                    .lines()
-                    .inspect(move |result| {
-                        if let Ok(line) = result {
-                            callback(line, LineDirection::Stdout);
-                        }
-                    }),
-            )
-                as std::pin::Pin<Box<dyn futures::Stream<Item = std::io::Result<String>> + Send>>
+        let incoming_lines: std::pin::Pin<
+            Box<dyn futures::Stream<Item = std::io::Result<String>> + Send>,
+        > = if let Some(callback) = self.debug_callback.clone() {
+            Box::pin(BufReader::new(child_stdout).lines().inspect(move |result| {
+                if let Ok(line) = result {
+                    callback(line, LineDirection::Stdout);
+                }
+            }))
         } else {
-            Box::pin(BufReader::new(child_stdout.compat()).lines())
+            Box::pin(BufReader::new(child_stdout).lines())
         };
 
         // Create a sink that writes lines (with newlines) to stdin with optional debug logging
-        let outgoing_sink = if let Some(callback) = self.debug_callback.clone() {
+        let outgoing_sink: std::pin::Pin<
+            Box<dyn futures::Sink<String, Error = std::io::Error> + Send>,
+        > = if let Some(callback) = self.debug_callback.clone() {
             Box::pin(futures::sink::unfold(
-                (child_stdin.compat_write(), callback),
+                (child_stdin, callback),
                 async move |(mut writer, callback), line: String| {
                     callback(&line, LineDirection::Stdin);
                     let mut bytes = line.into_bytes();
@@ -344,10 +312,9 @@ impl<Counterpart: AcpAgentCounterpartRole> agent_client_protocol::ConnectTo<Coun
                     Ok::<_, std::io::Error>((writer, callback))
                 },
             ))
-                as std::pin::Pin<Box<dyn futures::Sink<String, Error = std::io::Error> + Send>>
         } else {
             Box::pin(futures::sink::unfold(
-                child_stdin.compat_write(),
+                child_stdin,
                 async move |mut writer, line: String| {
                     let mut bytes = line.into_bytes();
                     bytes.push(b'\n');
@@ -357,16 +324,31 @@ impl<Counterpart: AcpAgentCounterpartRole> agent_client_protocol::ConnectTo<Coun
             ))
         };
 
-        // Race the protocol against child process exit
-        // If the child exits early (e.g., with an error), we return that error
-        let protocol_future = agent_client_protocol::ConnectTo::<Counterpart>::connect_to(
-            agent_client_protocol::Lines::new(outgoing_sink, incoming_lines),
+        // Race the protocol against child process exit.
+        // Also run stderr collection concurrently.
+        let protocol_future = crate::ConnectTo::<Counterpart>::connect_to(
+            crate::Lines::new(outgoing_sink, incoming_lines),
             client,
         );
 
-        tokio::select! {
-            result = protocol_future => result,
-            result = child_monitor => result,
+        let stderr_future = pin!(stderr_future);
+        let protocol_future = pin!(protocol_future);
+        let child_monitor = pin!(child_monitor);
+
+        // Run stderr reader alongside the main race
+        let main_race = async {
+            match futures::future::select(protocol_future, child_monitor).await {
+                futures::future::Either::Left((result, _))
+                | futures::future::Either::Right((result, _)) => result,
+            }
+        };
+
+        // Run stderr collection concurrently with the main logic.
+        // When main_race completes, we don't need stderr anymore.
+        let main_race = pin!(main_race);
+        match futures::future::select(main_race, stderr_future).await {
+            futures::future::Either::Left((result, _)) => result,
+            futures::future::Either::Right(((), protocol)) => protocol.await,
         }
     }
 }
@@ -380,7 +362,7 @@ impl AcpAgent {
     /// # Example
     ///
     /// ```
-    /// # use agent_client_protocol_tokio::AcpAgent;
+    /// # use agent_client_protocol::AcpAgent;
     /// let agent = AcpAgent::from_args([
     ///     "RUST_LOG=debug",
     ///     "cargo",
@@ -389,7 +371,7 @@ impl AcpAgent {
     ///     "my-crate",
     /// ]).unwrap();
     /// ```
-    pub fn from_args<I, T>(args: I) -> Result<Self, agent_client_protocol::Error>
+    pub fn from_args<I, T>(args: I) -> Result<Self, crate::Error>
     where
         I: IntoIterator<Item = T>,
         T: ToString,
@@ -397,18 +379,15 @@ impl AcpAgent {
         let args: Vec<String> = args.into_iter().map(|s| s.to_string()).collect();
 
         if args.is_empty() {
-            return Err(agent_client_protocol::util::internal_error(
-                "Arguments cannot be empty",
-            ));
+            return Err(crate::util::internal_error("Arguments cannot be empty"));
         }
 
         let mut env = vec![];
         let mut command_idx = 0;
 
-        // Parse leading FOO=bar arguments as environment variables
         for (i, arg) in args.iter().enumerate() {
             if let Some((name, value)) = parse_env_var(arg) {
-                env.push(agent_client_protocol::schema::EnvVariable::new(name, value));
+                env.push(crate::schema::EnvVariable::new(name, value));
                 command_idx = i + 1;
             } else {
                 break;
@@ -416,7 +395,7 @@ impl AcpAgent {
         }
 
         if command_idx >= args.len() {
-            return Err(agent_client_protocol::util::internal_error(
+            return Err(crate::util::internal_error(
                 "No command found (only environment variables provided)",
             ));
         }
@@ -424,7 +403,6 @@ impl AcpAgent {
         let command = PathBuf::from(&args[command_idx]);
         let cmd_args = args[command_idx + 1..].to_vec();
 
-        // Generate a name from the command
         let name = command
             .file_name()
             .and_then(|n| n.to_str())
@@ -432,8 +410,8 @@ impl AcpAgent {
             .to_string();
 
         Ok(AcpAgent {
-            server: agent_client_protocol::schema::McpServer::Stdio(
-                agent_client_protocol::schema::McpServerStdio::new(name, command)
+            server: crate::schema::McpServer::Stdio(
+                crate::schema::McpServerStdio::new(name, command)
                     .args(cmd_args)
                     .env(env),
             ),
@@ -443,9 +421,7 @@ impl AcpAgent {
 }
 
 /// Parse a string as an environment variable assignment (NAME=value).
-/// Returns None if it doesn't match the pattern.
 fn parse_env_var(s: &str) -> Option<(String, String)> {
-    // Must contain '=' and the part before must be a valid env var name
     let eq_pos = s.find('=')?;
     if eq_pos == 0 {
         return None;
@@ -454,8 +430,6 @@ fn parse_env_var(s: &str) -> Option<(String, String)> {
     let name = &s[..eq_pos];
     let value = &s[eq_pos + 1..];
 
-    // Env var names must start with a letter or underscore, and contain only
-    // alphanumeric characters and underscores
     let mut chars = name.chars();
     let first = chars.next()?;
     if !first.is_ascii_alphabetic() && first != '_' {
@@ -469,29 +443,22 @@ fn parse_env_var(s: &str) -> Option<(String, String)> {
 }
 
 impl FromStr for AcpAgent {
-    type Err = agent_client_protocol::Error;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let trimmed = s.trim();
 
-        // If it starts with '{', try to parse as JSON
         if trimmed.starts_with('{') {
-            let server: agent_client_protocol::schema::McpServer = serde_json::from_str(trimmed)
-                .map_err(|e| {
-                    agent_client_protocol::util::internal_error(format!(
-                        "Failed to parse JSON: {e}"
-                    ))
-                })?;
+            let server: crate::schema::McpServer = serde_json::from_str(trimmed)
+                .map_err(|e| crate::util::internal_error(format!("Failed to parse JSON: {e}")))?;
             return Ok(Self {
                 server,
                 debug_callback: None,
             });
         }
 
-        // Otherwise, parse as a command string
-        let parts = shell_words::split(trimmed).map_err(|e| {
-            agent_client_protocol::util::internal_error(format!("Failed to parse command: {e}"))
-        })?;
+        let parts = shell_words::split(trimmed)
+            .map_err(|e| crate::util::internal_error(format!("Failed to parse command: {e}")))?;
 
         Self::from_args(parts)
     }
@@ -505,7 +472,7 @@ mod tests {
     fn test_parse_simple_command() {
         let agent = AcpAgent::from_str("python agent.py").unwrap();
         match agent.server {
-            agent_client_protocol::schema::McpServer::Stdio(stdio) => {
+            crate::schema::McpServer::Stdio(stdio) => {
                 assert_eq!(stdio.name, "python");
                 assert_eq!(stdio.command, PathBuf::from("python"));
                 assert_eq!(stdio.args, vec!["agent.py"]);
@@ -519,7 +486,7 @@ mod tests {
     fn test_parse_command_with_args() {
         let agent = AcpAgent::from_str("node server.js --port 8080 --verbose").unwrap();
         match agent.server {
-            agent_client_protocol::schema::McpServer::Stdio(stdio) => {
+            crate::schema::McpServer::Stdio(stdio) => {
                 assert_eq!(stdio.name, "node");
                 assert_eq!(stdio.command, PathBuf::from("node"));
                 assert_eq!(stdio.args, vec!["server.js", "--port", "8080", "--verbose"]);
@@ -533,7 +500,7 @@ mod tests {
     fn test_parse_command_with_quotes() {
         let agent = AcpAgent::from_str(r#"python "my agent.py" --name "Test Agent""#).unwrap();
         match agent.server {
-            agent_client_protocol::schema::McpServer::Stdio(stdio) => {
+            crate::schema::McpServer::Stdio(stdio) => {
                 assert_eq!(stdio.name, "python");
                 assert_eq!(stdio.command, PathBuf::from("python"));
                 assert_eq!(stdio.args, vec!["my agent.py", "--name", "Test Agent"]);
@@ -554,7 +521,7 @@ mod tests {
         }"#;
         let agent = AcpAgent::from_str(json).unwrap();
         match agent.server {
-            agent_client_protocol::schema::McpServer::Stdio(stdio) => {
+            crate::schema::McpServer::Stdio(stdio) => {
                 assert_eq!(stdio.name, "my-agent");
                 assert_eq!(stdio.command, PathBuf::from("/usr/bin/python"));
                 assert_eq!(stdio.args, vec!["agent.py", "--verbose"]);
@@ -574,7 +541,7 @@ mod tests {
         }"#;
         let agent = AcpAgent::from_str(json).unwrap();
         match agent.server {
-            agent_client_protocol::schema::McpServer::Http(http) => {
+            crate::schema::McpServer::Http(http) => {
                 assert_eq!(http.name, "remote-agent");
                 assert_eq!(http.url, "https://example.com/agent");
                 assert!(http.headers.is_empty());

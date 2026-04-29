@@ -1,16 +1,13 @@
-//! Tokio-based utilities for the Agent Client Protocol
-//!
-//! This crate provides higher-level functionality for working with ACP
-//! that requires the Tokio async runtime, such as spawning agent processes
-//! and creating connections.
+//! Stdio transport for connecting ACP components via standard input/output.
 
-mod acp_agent;
-
-pub use acp_agent::{AcpAgent, LineDirection};
-use agent_client_protocol::{ByteStreams, ConnectTo, Role};
+use crate::acp_agent::LineDirection;
+use crate::{ByteStreams, ConnectTo, Role};
 use std::sync::Arc;
-use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
+/// A transport that connects to an ACP peer via standard input/output.
+///
+/// This is useful for building agents or proxies that communicate over stdio,
+/// which is the standard transport for MCP and ACP subprocess communication.
 pub struct Stdio {
     debug_callback: Option<Arc<dyn Fn(&str, LineDirection) + Send + Sync + 'static>>,
 }
@@ -22,6 +19,7 @@ impl std::fmt::Debug for Stdio {
 }
 
 impl Stdio {
+    /// Create a new `Stdio` transport.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -29,6 +27,7 @@ impl Stdio {
         }
     }
 
+    /// Add a debug callback that will be invoked for each line sent/received.
     #[must_use]
     pub fn with_debug<F>(mut self, callback: F) -> Self
     where
@@ -49,31 +48,24 @@ impl<Counterpart: Role> ConnectTo<Counterpart> for Stdio {
     async fn connect_to(
         self,
         client: impl ConnectTo<Counterpart::Counterpart>,
-    ) -> Result<(), agent_client_protocol::Error> {
+    ) -> Result<(), crate::Error> {
+        let stdin = blocking::Unblock::new(std::io::stdin());
+        let stdout = blocking::Unblock::new(std::io::stdout());
+
         if let Some(callback) = self.debug_callback {
-            use futures::AsyncBufReadExt;
-            use futures::AsyncWriteExt;
-            use futures::StreamExt;
             use futures::io::BufReader;
+            use futures::{AsyncBufReadExt, AsyncWriteExt, StreamExt};
 
-            // With debug: use Lines with interception
-            let stdin = tokio::io::stdin();
-            let stdout = tokio::io::stdout();
-
-            // Convert stdio to line streams with debug inspection
             let incoming_callback = callback.clone();
-            let incoming_lines = Box::pin(BufReader::new(stdin.compat()).lines().inspect(
-                move |result| {
-                    if let Ok(line) = result {
-                        incoming_callback(line, LineDirection::Stdin);
-                    }
-                },
-            ))
+            let incoming_lines = Box::pin(BufReader::new(stdin).lines().inspect(move |result| {
+                if let Ok(line) = result {
+                    incoming_callback(line, LineDirection::Stdin);
+                }
+            }))
                 as std::pin::Pin<Box<dyn futures::Stream<Item = std::io::Result<String>> + Send>>;
 
-            // Create a sink that writes lines with debug logging
             let outgoing_sink = Box::pin(futures::sink::unfold(
-                (stdout.compat_write(), callback),
+                (stdout, callback),
                 async move |(mut writer, callback), line: String| {
                     callback(&line, LineDirection::Stdout);
                     let mut bytes = line.into_bytes();
@@ -85,20 +77,12 @@ impl<Counterpart: Role> ConnectTo<Counterpart> for Stdio {
                 as std::pin::Pin<Box<dyn futures::Sink<String, Error = std::io::Error> + Send>>;
 
             ConnectTo::<Counterpart>::connect_to(
-                agent_client_protocol::Lines::new(outgoing_sink, incoming_lines),
+                crate::Lines::new(outgoing_sink, incoming_lines),
                 client,
             )
             .await
         } else {
-            // Without debug: use simple ByteStreams
-            ConnectTo::<Counterpart>::connect_to(
-                ByteStreams::new(
-                    tokio::io::stdout().compat_write(),
-                    tokio::io::stdin().compat(),
-                ),
-                client,
-            )
-            .await
+            ConnectTo::<Counterpart>::connect_to(ByteStreams::new(stdout, stdin), client).await
         }
     }
 }

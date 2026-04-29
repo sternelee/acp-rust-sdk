@@ -70,10 +70,8 @@
 //!
 //! ## Related Crates
 //!
-//! - [`agent-client-protocol-tokio`] - Tokio utilities for spawning agent processes
 //! - [`agent-client-protocol-conductor`] - Binary for running proxy chains
 //!
-//! [`agent-client-protocol-tokio`]: https://crates.io/crates/agent-client-protocol-tokio
 //! [`agent-client-protocol-conductor`]: https://crates.io/crates/agent-client-protocol-conductor
 
 /// Capability management for the `_meta.symposium` object
@@ -141,6 +139,12 @@ pub use agent_client_protocol_derive::{JsonRpcNotification, JsonRpcRequest, Json
 
 mod session;
 pub use session::*;
+
+mod acp_agent;
+pub use acp_agent::{AcpAgent, LineDirection};
+
+mod stdio;
+pub use stdio::Stdio;
 
 /// This is a hack that must be given as the final argument of
 /// [`McpServerBuilder::tool_fn`](`crate::mcp_server::McpServerBuilder::tool_fn`) when defining tools.

@@ -64,8 +64,8 @@ pub fn testy_binary() -> PathBuf {
 
 /// Returns an AcpAgent configured for the test agent.
 #[must_use]
-pub fn testy() -> agent_client_protocol_tokio::AcpAgent {
-    agent_client_protocol_tokio::AcpAgent::from_args([testy_binary().to_string_lossy().to_string()])
+pub fn testy() -> agent_client_protocol::AcpAgent {
+    agent_client_protocol::AcpAgent::from_args([testy_binary().to_string_lossy().to_string()])
         .expect("failed to create test agent")
 }
 

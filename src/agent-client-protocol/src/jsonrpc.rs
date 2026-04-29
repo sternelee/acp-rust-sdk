@@ -511,14 +511,10 @@ where
 /// ```no_run
 /// # use agent_client_protocol::UntypedRole;
 /// # use agent_client_protocol::{Builder};
-/// # use agent_client_protocol::ByteStreams;
+/// # use agent_client_protocol::Stdio;
 /// # use agent_client_protocol::schema::{InitializeRequest, InitializeResponse, PromptRequest, PromptResponse, SessionNotification};
-/// # use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 /// # async fn example() -> Result<(), agent_client_protocol::Error> {
-/// let transport = ByteStreams::new(
-///     tokio::io::stdout().compat_write(),
-///     tokio::io::stdin().compat(),
-/// );
+/// let transport = Stdio::new();
 ///
 /// UntypedRole.builder()
 ///     .name("my-agent")  // Optional: for debugging logs
@@ -1076,14 +1072,10 @@ impl<
     /// ```no_run
     /// # use agent_client_protocol::UntypedRole;
     /// # use agent_client_protocol::{Builder};
-    /// # use agent_client_protocol::ByteStreams;
-    /// # use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
+    /// # use agent_client_protocol::Stdio;
     /// # use agent_client_protocol_test::*;
     /// # async fn example() -> Result<(), agent_client_protocol::Error> {
-    /// let transport = ByteStreams::new(
-    ///     tokio::io::stdout().compat_write(),
-    ///     tokio::io::stdin().compat(),
-    /// );
+    /// let transport = Stdio::new();
     ///
     /// UntypedRole.builder()
     ///     .on_receive_request(async |req: MyRequest, responder, cx| {
@@ -1122,13 +1114,10 @@ impl<
     /// # use agent_client_protocol::{Builder};
     /// # use agent_client_protocol::ByteStreams;
     /// # use agent_client_protocol::schema::InitializeRequest;
-    /// # use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
+    /// # use agent_client_protocol::Stdio;
     /// # use agent_client_protocol_test::*;
     /// # async fn example() -> Result<(), agent_client_protocol::Error> {
-    /// let transport = ByteStreams::new(
-    ///     tokio::io::stdout().compat_write(),
-    ///     tokio::io::stdin().compat(),
-    /// );
+    /// let transport = Stdio::new();
     ///
     /// UntypedRole.builder()
     ///     .on_receive_request(async |req: MyRequest, responder, cx| {

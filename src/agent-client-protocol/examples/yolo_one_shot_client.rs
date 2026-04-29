@@ -16,11 +16,10 @@ use agent_client_protocol::schema::{
     RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
     SelectedPermissionOutcome, SessionNotification, TextContent,
 };
-use agent_client_protocol::{Agent, Client, ConnectionTo};
+use agent_client_protocol::{AcpAgent, Agent, ConnectionTo};
 use clap::Parser;
 use std::path::PathBuf;
-use tokio::process::Child;
-use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
+use std::str::FromStr;
 
 #[derive(Parser)]
 #[command(name = "yolo-one-shot-client")]
@@ -34,63 +33,19 @@ struct Cli {
     prompt: String,
 }
 
-/// Parse a command string into command and args
-fn parse_command_string(s: &str) -> Result<(PathBuf, Vec<String>), Box<dyn std::error::Error>> {
-    let parts = shell_words::split(s)?;
-    if parts.is_empty() {
-        return Err("Command string cannot be empty".into());
-    }
-    let command = PathBuf::from(&parts[0]);
-    let args = parts[1..].to_vec();
-    Ok((command, args))
-}
-
-/// Spawn a process for the agent and get stdio streams.
-fn spawn_agent_process(
-    command: PathBuf,
-    args: Vec<String>,
-) -> Result<
-    (
-        tokio::process::ChildStdin,
-        tokio::process::ChildStdout,
-        Child,
-    ),
-    Box<dyn std::error::Error>,
-> {
-    let mut cmd = tokio::process::Command::new(&command);
-    cmd.args(&args);
-    cmd.stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped());
-
-    let mut child = cmd.spawn()?;
-    let child_stdin = child.stdin.take().ok_or("Failed to open stdin")?;
-    let child_stdout = child.stdout.take().ok_or("Failed to open stdout")?;
-
-    Ok((child_stdin, child_stdout, child))
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
-    // Parse the command string
-    let (command, args) = parse_command_string(&cli.command)?;
+    eprintln!("🚀 Spawning agent: {}", cli.command);
 
-    eprintln!("🚀 Spawning agent: {} {:?}", command.display(), args);
+    let agent = AcpAgent::from_str(&cli.command)?;
 
-    // Spawn the agent process
-    let (child_stdin, child_stdout, mut child) = spawn_agent_process(command, args)?;
-
-    // Create transport and connection
-    let transport =
-        agent_client_protocol::ByteStreams::new(child_stdin.compat_write(), child_stdout.compat());
-
-    // Run the client
-    Client
+    // Run the client — AcpAgent implements ConnectTo, so it serves as the transport
+    agent_client_protocol::Client
         .builder()
         .on_receive_notification(
             async move |notification: SessionNotification, _cx| {
-                // Print session updates to stdout (so 2>/dev/null shows only agent output)
                 println!("{:?}", notification.update);
                 Ok(())
             },
@@ -114,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             agent_client_protocol::on_receive_request!(),
         )
-        .connect_with(transport, |connection: ConnectionTo<Agent>| async move {
+        .connect_with(agent, |connection: ConnectionTo<Agent>| async move {
             // Initialize the agent
             eprintln!("🤝 Initializing agent...");
             let init_response = connection
@@ -152,9 +107,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         })
         .await?;
-
-    // Kill the child process when done
-    drop(child.kill().await);
 
     Ok(())
 }

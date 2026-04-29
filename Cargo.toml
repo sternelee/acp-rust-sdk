@@ -6,7 +6,6 @@ members = [
     "src/agent-client-protocol-derive",
     "src/agent-client-protocol-rmcp",
     "src/agent-client-protocol-test",
-    "src/agent-client-protocol-tokio",
     "src/agent-client-protocol-trace-viewer",
     "src/yopo",
 ]
@@ -26,7 +25,6 @@ agent-client-protocol-conductor = { path = "src/agent-client-protocol-conductor"
 agent-client-protocol-derive = { path = "src/agent-client-protocol-derive", version = "0.11.0" }
 agent-client-protocol-rmcp = { path = "src/agent-client-protocol-rmcp", version = "0.11.1" }
 agent-client-protocol-test = { path = "src/agent-client-protocol-test" }
-agent-client-protocol-tokio = { path = "src/agent-client-protocol-tokio", version = "0.11.1" }
 agent-client-protocol-trace-viewer = { path = "src/agent-client-protocol-trace-viewer", version = "0.11.0" }
 yopo = { package = "agent-client-protocol-yopo", path = "src/yopo" }
 
@@ -48,10 +46,6 @@ uuid = { version = "1.18", features = ["v4"] }
 # Error handling
 anyhow = "1.0"
 thiserror = "2.0"
-
-# Logging
-env_logger = "0.11"
-log = "0.4"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
@@ -67,16 +61,12 @@ axum = "0.8"
 hyper = "1.0"
 tower = "0.5"
 tower-http = { version = "0.6", features = ["fs"] }
-
-# Other dependencies
-async-broadcast = "0.7"
+async-process = "2"
 async-stream = "0.3.6"
-async-trait = "0.1"
+blocking = "1"
 chrono = "0.4"
-derive_more = { version = "2", features = ["from"] }
 futures = "0.3.32"
 futures-concurrency = "7.6.3"
-fxhash = "0.2.1"
 jsonrpcmsg = "0.1.2"
 open = "5"
 rustc-hash = "2.1.1"
@@ -92,11 +82,6 @@ syn = { version = "2", features = ["full", "extra-traits"] }
 # Testing
 expect-test = "1.5"
 regex = "1.12.2"
-futures-util = { version = "0.3", features = ["io"] }
-piper = "0.2"
-pretty_assertions = "1"
-rustyline = "17"
-tokio-test = "0.4"
 
 [workspace.lints.rust]
 future_incompatible = { level = "warn", priority = -1 }

@@ -68,31 +68,29 @@ impl DebugLogger {
     pub fn create_callback(
         &self,
         component_label: String,
-    ) -> impl Fn(&str, agent_client_protocol_tokio::LineDirection) + Send + Sync + 'static {
+    ) -> impl Fn(&str, agent_client_protocol::LineDirection) + Send + Sync + 'static {
         let writer = self.writer.clone();
         let start_time = self.start_time;
-        move |line: &str, direction: agent_client_protocol_tokio::LineDirection| {
+        move |line: &str, direction: agent_client_protocol::LineDirection| {
             let writer = writer.clone();
             let component_label = component_label.clone();
             let line = line.to_string();
             let elapsed_ms = start_time.elapsed().as_millis();
             tokio::spawn(async move {
                 let arrow = match direction {
-                    agent_client_protocol_tokio::LineDirection::Stdin => "→",
-                    agent_client_protocol_tokio::LineDirection::Stdout => "←",
-                    agent_client_protocol_tokio::LineDirection::Stderr => "!",
+                    agent_client_protocol::LineDirection::Stdin => "→",
+                    agent_client_protocol::LineDirection::Stdout => "←",
+                    agent_client_protocol::LineDirection::Stderr => "!",
                 };
 
                 // Strip ANSI escape codes from stderr to keep logs clean
-                let cleaned_line = if matches!(
-                    direction,
-                    agent_client_protocol_tokio::LineDirection::Stderr
-                ) {
-                    let bytes = strip_ansi_escapes::strip(&line);
-                    String::from_utf8_lossy(&bytes).to_string()
-                } else {
-                    line
-                };
+                let cleaned_line =
+                    if matches!(direction, agent_client_protocol::LineDirection::Stderr) {
+                        let bytes = strip_ansi_escapes::strip(&line);
+                        String::from_utf8_lossy(&bytes).to_string()
+                    } else {
+                        line
+                    };
 
                 let log_line =
                     format!("{component_label} {arrow} +{elapsed_ms}ms {cleaned_line}\n");

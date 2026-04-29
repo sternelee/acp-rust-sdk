@@ -823,7 +823,7 @@ pub mod running_proxies_with_conductor {
     //! let my_proxy = MyProxy::new();
     //!
     //! // Spawn the agent process
-    //! let agent_process = agent_client_protocol_tokio::spawn_process("claude-code", &["--agent"]).await?;
+    //! let agent_process = agent_client_protocol::spawn_process("claude-code", &["--agent"]).await?;
     //!
     //! // Create the conductor with your proxy chain
     //! let conductor = ConductorImpl::new(ProxiesAndAgent {

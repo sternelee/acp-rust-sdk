@@ -104,7 +104,7 @@ use crate::{Channel, Result, role::Role};
 /// ```
 ///
 /// [`ByteStreams`]: crate::ByteStreams
-/// [`AcpAgent`]: https://docs.rs/agent-client-protocol-tokio/latest/agent_client_protocol_tokio/struct.AcpAgent.html
+/// [`AcpAgent`]: crate::AcpAgent
 /// [`Builder`]: crate::Builder
 pub trait ConnectTo<R: Role>: Send + 'static {
     /// Serve this component by forwarding to a client component.

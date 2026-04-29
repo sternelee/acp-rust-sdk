@@ -51,17 +51,19 @@ schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
-tokio-util.workspace = true
 tracing.workspace = true
 uuid.workspace = true
+async-process.workspace = true
+blocking.workspace = true
+shell-words.workspace = true
+strip-ansi-escapes.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
 
 [dev-dependencies]
 agent-client-protocol-test.workspace = true
 clap.workspace = true
 expect-test.workspace = true
-shell-words.workspace = true
-tokio.workspace = true
 
 [lints]
 workspace = true
